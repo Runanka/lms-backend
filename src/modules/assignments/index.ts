@@ -1,0 +1,1 @@
+export { Assignment } from './assignment.model.js';

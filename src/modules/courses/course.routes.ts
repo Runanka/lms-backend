@@ -3,7 +3,8 @@ import type { Request, Response, NextFunction } from 'express';
 import { Types } from 'mongoose';
 import { Course } from './course.model.js';
 import { validate } from '../../middleware/validate.js';
-import { NotFoundError } from '../../shared/errors/index.js';
+import { coachOnly } from '../../middleware/roles.js';
+import { ForbiddenError, NotFoundError } from '../../shared/errors/index.js';
 import {
   createCourseSchema,
   updateCourseSchema,
@@ -11,6 +12,7 @@ import {
   type CreateCourseInput,
   type ListCoursesQuery,
 } from './course.schema.js';
+import { authenticate } from '../../middleware/auth.js';
 
 const router = Router();
 
@@ -53,20 +55,15 @@ router.get(
 // POST /api/courses
 router.post(
   '/',
+  authenticate,
+  coachOnly,
   validate(createCourseSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const data = req.body as CreateCourseInput;
 
-    // TODO: Get coachId from authenticated user
-    // For now, require it in headers or use a placeholder
-    const coachId = req.headers['x-coach-id'] as string;
-    if (!coachId) {
-      return res.status(400).json({ message: 'x-coach-id header required' });
-    }
-
     const course = new Course({
       ...data,
-      coachId: new Types.ObjectId(coachId),
+      coachId: req.user!.dbUser!._id,
       modules: data.modules?.map((m, i) => ({
         ...m,
         order: m.order ?? i,
@@ -85,15 +82,21 @@ router.post(
 // PUT /api/courses/:id
 router.put(
   '/:id',
+  authenticate,
+  coachOnly,
   validate(updateCourseSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const course = await Course.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-
+    const course = await Course.findById(req.params.id);
     if (!course) throw new NotFoundError('Course');
+
+    // Verify ownership
+    if (course.coachId.toString() !== req.user!.dbUser!._id.toString()) {
+      throw new ForbiddenError('You can only edit your own courses');
+    }
+
+    Object.assign(course, req.body);
+    await course.save();
+
     res.json({ message: 'Course updated', course });
   })
 );
@@ -101,9 +104,17 @@ router.put(
 // DELETE /api/courses/:id
 router.delete(
   '/:id',
+  authenticate,
+  coachOnly,
   asyncHandler(async (req: Request, res: Response) => {
-    const course = await Course.findByIdAndDelete(req.params.id);
+    const course = await Course.findById(req.params.id);
     if (!course) throw new NotFoundError('Course');
+
+    if (course.coachId.toString() !== req.user!.dbUser!._id.toString()) {
+      throw new ForbiddenError('You can only delete your own courses');
+    }
+
+    await course.deleteOne();
     res.json({ message: 'Course deleted' });
   })
 );

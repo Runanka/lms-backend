@@ -6,8 +6,7 @@ type ValidateTarget = 'body' | 'query' | 'params';
 export function validate(schema: z.ZodType, target: ValidateTarget = 'body') {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = schema.parse(req[target]);
-      req[target] = data;
+      schema.parse(req[target]);
       next();
     } catch (error) {
       next(error); 

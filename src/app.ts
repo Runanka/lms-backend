@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { courseRoutes } from './modules/courses/index.js';
 import { progressRoutes } from './modules/progress/index.js';
+import { commentRoutes } from './modules/comments/index.js';
+import { pathRoutes } from './modules/paths/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
@@ -18,7 +20,9 @@ export function createApp() {
 
   // API routes
   app.use('/api/courses', courseRoutes);
+  app.use('/api/courses', commentRoutes);
   app.use('/api/progress', progressRoutes);
+  app.use('/api/paths', pathRoutes);
 
   // Error handler
   app.use(errorHandler);

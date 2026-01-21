@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { userRoutes } from './modules/users/index.js';
 import { courseRoutes } from './modules/courses/index.js';
 import { progressRoutes } from './modules/progress/index.js';
 import { commentRoutes } from './modules/comments/index.js';
@@ -19,6 +20,7 @@ export function createApp() {
   });
 
   // API routes
+  app.use('/api/users', userRoutes);
   app.use('/api/courses', courseRoutes);
   app.use('/api/courses', commentRoutes);
   app.use('/api/progress', progressRoutes);

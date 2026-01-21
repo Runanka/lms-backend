@@ -69,7 +69,6 @@ export async function authenticate(
         zitadelId: payload.sub,
         email: payload.email || '',
         name: payload.name || '',
-        role: payload['urn:zitadel:iam:user:metadata']?.role || 'student',
       });
     }
 

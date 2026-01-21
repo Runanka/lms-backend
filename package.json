@@ -1,16 +1,24 @@
 {
-  "name": "lms-backend",
+  "name": "skillwise-lms-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Learning Management System API built with Express.js, TypeScript, and MongoDB",
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "lint": "eslint src/**/*.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "lms",
+    "learning-management-system",
+    "express",
+    "typescript",
+    "mongodb",
+    "education"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {

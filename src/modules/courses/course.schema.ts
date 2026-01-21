@@ -1,41 +1,53 @@
 import { z } from 'zod';
 
-// Resource schema
+// Resource schema - must have content
 const resourceSchema = z.object({
   type: z.enum(['video', 'document']),
-  title: z.string().min(1, 'Title is required'),
+  title: z.string().min(1, 'Resource title is required'),
   youtubeUrl: z.string().url().optional(),
-  content: z.string().max(50000).optional(),
+  content: z.string().min(1).max(50000).optional(),
 }).refine((data) => {
-  if (data.type === 'video' && !data.youtubeUrl) {
-    return false;
+  if (data.type === 'video') {
+    return !!data.youtubeUrl && data.youtubeUrl.trim().length > 0;
   }
-  if (data.type === 'document' && !data.content) {
-    return false;
+  if (data.type === 'document') {
+    return !!data.content && data.content.trim().length > 0;
   }
   return true;
 }, {
-  message: 'Video requires youtubeUrl, document requires content',
+  message: 'Video requires a valid YouTube URL, document requires content',
 });
 
-// Module schema
+// Module schema - must have either resources or an assignment
 const moduleSchema = z.object({
   title: z.string().min(1, 'Module title is required'),
   order: z.number().int().min(0),
-  resources: z.array(resourceSchema).optional().default([]),
+  resources: z.array(resourceSchema).default([]),
   assignmentId: z.string().optional(),
+}).refine((data) => {
+  // Module must have at least one resource or an assignment
+  const hasResources = data.resources && data.resources.length > 0;
+  const hasAssignment = !!data.assignmentId;
+  return hasResources || hasAssignment;
+}, {
+  message: 'Each module must have at least one resource or an assignment',
 });
 
-// Create course request
+// Create course request - must have at least one module
 export const createCourseSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(200),
   description: z.string().optional().default(''),
-  thumbnailUrl: z.string().url().optional(),
-  modules: z.array(moduleSchema).optional().default([]),
+  thumbnailUrl: z.string().url().optional().or(z.literal('')),
+  modules: z.array(moduleSchema).min(1, 'Course must have at least one module'),
 });
 
-// Update course request
-export const updateCourseSchema = createCourseSchema.partial();
+// Update course request - same validation
+export const updateCourseSchema = z.object({
+  title: z.string().min(3, 'Title must be at least 3 characters').max(200).optional(),
+  description: z.string().optional(),
+  thumbnailUrl: z.string().url().optional().or(z.literal('')),
+  modules: z.array(moduleSchema).min(1, 'Course must have at least one module').optional(),
+});
 
 // Query params for listing
 export const listCoursesQuerySchema = z.object({

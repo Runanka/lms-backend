@@ -5,9 +5,15 @@ const mcqOptionSchema = z.object({
   isCorrect: z.boolean().default(false),
 });
 
+// MCQ question must have text and at least one correct answer
 const mcqQuestionSchema = z.object({
   questionText: z.string().min(1, 'Question text is required'),
   options: z.array(mcqOptionSchema).min(2, 'At least 2 options required').max(6),
+}).refine((data) => {
+  // At least one option must be correct
+  return data.options.some(opt => opt.isCorrect);
+}, {
+  message: 'Each question must have at least one correct answer',
 });
 
 const subjectiveQuestionSchema = z.object({
@@ -25,17 +31,17 @@ const baseAssignmentSchema = z.object({
   subjectiveQuestions: z.array(subjectiveQuestionSchema).optional(),
 });
 
-// Create schema with refinement
+// Create schema with refinement - must have questions
 export const createAssignmentSchema = baseAssignmentSchema.refine((data) => {
-  if (data.type === 'mcq' && (!data.mcqQuestions || data.mcqQuestions.length === 0)) {
-    return false;
+  if (data.type === 'mcq') {
+    return data.mcqQuestions && data.mcqQuestions.length > 0;
   }
-  if (data.type === 'subjective' && (!data.subjectiveQuestions || data.subjectiveQuestions.length === 0)) {
-    return false;
+  if (data.type === 'subjective') {
+    return data.subjectiveQuestions && data.subjectiveQuestions.length > 0;
   }
   return true;
 }, {
-  message: 'MCQ assignments require mcqQuestions, subjective assignments require subjectiveQuestions',
+  message: 'MCQ assignments require at least one question, subjective assignments require at least one question',
 });
 
 // Update schema - partial of base without courseId (no refinement needed for updates)

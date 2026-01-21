@@ -42,6 +42,115 @@ router.get(
   })
 );
 
+// GET /api/paths/my-paths - Get started paths with progress (Student)
+// NOTE: This must be BEFORE /:id to avoid "my-paths" being treated as an id
+router.get(
+  '/my-paths',
+  authenticate,
+  studentOnly,
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.dbUser!._id;
+
+    const enrollments = await PathEnrollment.find({ userId })
+      .populate({
+        path: 'pathId',
+        populate: { path: 'courses', select: 'title modules' },
+      })
+      .sort({ startedAt: -1 });
+
+    // Calculate progress for each path
+    const pathsWithProgress = await Promise.all(
+      enrollments.map(async (enrollment) => {
+        const path = enrollment.pathId as any;
+        if (!path) return null;
+
+        const courseIds = path.courses.map((c: any) => c._id);
+
+        // Get progress for all courses in this path
+        const progresses = await Progress.find({
+          userId,
+          courseId: { $in: courseIds },
+        });
+
+        // Calculate total resources and completed
+        let totalResources = 0;
+        let completedResources = 0;
+
+        path.courses.forEach((course: any) => {
+          const courseProgress = progresses.find(
+            (p) => p.courseId.toString() === course._id.toString()
+          );
+
+          const resourceCount = course.modules?.reduce(
+            (acc: number, m: any) => acc + (m.resources?.length || 0),
+            0
+          ) || 0;
+
+          totalResources += resourceCount;
+
+          if (courseProgress) {
+            completedResources +=
+              courseProgress.completedVideos.length +
+              courseProgress.completedDocuments.length;
+          }
+        });
+
+        const progressPercent = totalResources > 0
+          ? Math.round((completedResources / totalResources) * 100)
+          : 0;
+
+        return {
+          path: {
+            _id: path._id,
+            title: path.title,
+            description: path.description,
+            thumbnailUrl: path.thumbnailUrl,
+            totalCourses: path.courses.length,
+          },
+          startedAt: enrollment.startedAt,
+          completedAt: enrollment.completedAt,
+          progress: progressPercent,
+          coursesCompleted: progresses.filter((p) => p.completedAt).length,
+        };
+      })
+    );
+
+    res.json({ paths: pathsWithProgress.filter(Boolean) });
+  })
+);
+
+// POST /api/paths/start - Start a path (Student)
+// NOTE: This must be BEFORE /:id routes
+router.post(
+  '/start',
+  authenticate,
+  studentOnly,
+  validate(startPathSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { pathId } = req.body;
+    const userId = req.user!.dbUser!._id;
+
+    const path = await Path.findById(pathId);
+    if (!path) throw new NotFoundError('Path');
+
+    // Check if already started
+    const existing = await PathEnrollment.findOne({ userId, pathId });
+    if (existing) {
+      return res.status(409).json({ message: 'Already started this path' });
+    }
+
+    const enrollment = await PathEnrollment.create({
+      userId,
+      pathId: new Types.ObjectId(pathId),
+    });
+
+    res.status(201).json({
+      message: 'Path started',
+      enrollmentId: enrollment._id,
+    });
+  })
+);
+
 // GET /api/paths/:id - Get path details with courses in order
 router.get(
   '/:id',
@@ -170,113 +279,6 @@ router.delete(
     ]);
 
     res.json({ message: 'Path deleted' });
-  })
-);
-
-// POST /api/paths/start - Start a path (Student)
-router.post(
-  '/start',
-  authenticate,
-  studentOnly,
-  validate(startPathSchema),
-  asyncHandler(async (req: Request, res: Response) => {
-    const { pathId } = req.body;
-    const userId = req.user!.dbUser!._id;
-
-    const path = await Path.findById(pathId);
-    if (!path) throw new NotFoundError('Path');
-
-    // Check if already started
-    const existing = await PathEnrollment.findOne({ userId, pathId });
-    if (existing) {
-      return res.status(409).json({ message: 'Already started this path' });
-    }
-
-    const enrollment = await PathEnrollment.create({
-      userId,
-      pathId: new Types.ObjectId(pathId),
-    });
-
-    res.status(201).json({
-      message: 'Path started',
-      enrollmentId: enrollment._id,
-    });
-  })
-);
-
-// GET /api/paths/my-paths - Get started paths with progress (Student)
-router.get(
-  '/my-paths',
-  authenticate,
-  studentOnly,
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user!.dbUser!._id;
-
-    const enrollments = await PathEnrollment.find({ userId })
-      .populate({
-        path: 'pathId',
-        populate: { path: 'courses', select: 'title modules' },
-      })
-      .sort({ startedAt: -1 });
-
-    // Calculate progress for each path
-    const pathsWithProgress = await Promise.all(
-      enrollments.map(async (enrollment) => {
-        const path = enrollment.pathId as any;
-        if (!path) return null;
-
-        const courseIds = path.courses.map((c: any) => c._id);
-
-        // Get progress for all courses in this path
-        const progresses = await Progress.find({
-          userId,
-          courseId: { $in: courseIds },
-        });
-
-        // Calculate total resources and completed
-        let totalResources = 0;
-        let completedResources = 0;
-
-        path.courses.forEach((course: any) => {
-          const courseProgress = progresses.find(
-            (p) => p.courseId.toString() === course._id.toString()
-          );
-
-          const resourceCount = course.modules?.reduce(
-            (acc: number, m: any) => acc + (m.resources?.length || 0),
-            0
-          ) || 0;
-
-          totalResources += resourceCount;
-
-          if (courseProgress) {
-            completedResources +=
-              courseProgress.completedVideos.length +
-              courseProgress.completedDocuments.length;
-          }
-        });
-
-        const progressPercent = totalResources > 0
-          ? Math.round((completedResources / totalResources) * 100)
-          : 0;
-
-        return {
-          path: {
-            _id: path._id,
-            title: path.title,
-            description: path.description,
-            thumbnailUrl: path.thumbnailUrl,
-            totalCourses: path.courses.length,
-          },
-          startedAt: enrollment.startedAt,
-          completedAt: enrollment.completedAt,
-          progress: progressPercent,
-          coursesCompleted: progresses.filter((p) => p.completedAt).length,
-        };
-      })
-    );
-
-    res.json({ paths: pathsWithProgress.filter(Boolean) });
   })
 );
 

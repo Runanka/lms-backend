@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { userRoutes } from './modules/users/index.js';
 import { courseRoutes } from './modules/courses/index.js';
+import { assignmentRoutes } from './modules/assignments/index.js';
 import { progressRoutes } from './modules/progress/index.js';
 import { commentRoutes } from './modules/comments/index.js';
 import { pathRoutes } from './modules/paths/index.js';
@@ -23,6 +24,7 @@ export function createApp() {
   app.use('/api/users', userRoutes);
   app.use('/api/courses', courseRoutes);
   app.use('/api/courses', commentRoutes);
+  app.use('/api/assignments', assignmentRoutes);
   app.use('/api/progress', progressRoutes);
   app.use('/api/paths', pathRoutes);
 

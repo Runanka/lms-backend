@@ -11,8 +11,27 @@ import { errorHandler } from './middleware/errorHandler.js';
 export function createApp() {
   const app = express();
 
-  // Middleware
-  app.use(cors());
+  // CORS configuration - allow specific origins with credentials
+  const allowedOrigins = [
+    'https://app.skillwise.fun',
+    'https://identity.skillwise.fun',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ];
+
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, origin);
+      }
+      return callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+  }));
   app.use(express.json());
 
   // Health check route
